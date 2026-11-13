@@ -1,3 +1,16 @@
+import {
+  AuthBootstrap,
+  AccountNav,
+  GuestOnly,
+  Protected,
+  SignIn,
+  ForgotPassword,
+  ResetPassword,
+  VerifyEmail,
+  Account,
+  Settings,
+  AdminAccess,
+} from "./features/auth/AuthPages";
 import { useEffect, useState } from "react";
 import { BrowserRouter, Link, Route, Routes } from "react-router-dom";
 import {
@@ -81,7 +94,7 @@ function Foundation() {
             <h2>A solid place to build.</h2>
           </div>
           <span className="phase-badge">
-            <Layers3 size={14} /> Phase 01 · Foundation
+            <Layers3 size={14} /> Phase 02 · Accounts
           </span>
         </div>
         <div className="cards">
@@ -161,17 +174,17 @@ function Foundation() {
             <span className="icon-tile">
               <Radio size={21} />
             </span>
-            <span className="overline">NEXT UP · PHASE 02</span>
+            <span className="overline">NEXT UP · PHASE 03</span>
             <h3>
-              Connection starts
+              A space for
               <br />
-              with identity.
+              every conversation.
             </h3>
             <p>
               Secure accounts, profiles, and role-based access are the next
               milestone.
             </p>
-            <span className="coming-soon">Planned · Awaiting approval</span>
+            <span className="coming-soon">Planned · Next milestone</span>
           </article>
         </div>
       </section>
@@ -194,7 +207,7 @@ function Roadmap() {
     <section className="roadmap">
       <span className="overline">THE ROAD AHEAD</span>
       <h1>Built with intention.</h1>
-      <p>Only Phase 1 is implemented. Later phases require approval.</p>
+      <p>Phases 1 and 2 are implemented. Later phases require approval.</p>
       <ol>
         {[
           "Foundation, architecture, Docker & schema",
@@ -211,7 +224,7 @@ function Roadmap() {
           <li key={phase}>
             <span>{String(index + 1).padStart(2, "0")}</span>
             {phase}
-            <small>{index === 0 ? "Implemented" : "Planned"}</small>
+            <small>{index < 2 ? "Implemented" : "Planned"}</small>
           </li>
         ))}
       </ol>
@@ -225,50 +238,72 @@ export default function App() {
   const { dark, toggleTheme } = usePreferences();
   return (
     <BrowserRouter>
-      <div className={dark ? "app theme-dark" : "app"}>
-        <a className="skip-link" href="#main">
-          Skip to content
-        </a>
-        <header>
-          <Link className="brand" to="/">
-            <span className="brand-icon">
-              <MessageCircle size={22} />
-            </span>
-            WebRchat<span className="brand-dot">.</span>
-          </Link>
-          <nav aria-label="Main navigation">
-            <Link to="/">Workspace</Link>
-            <Link to="/roadmap">Roadmap</Link>
-          </nav>
-          <button
-            className="theme-button"
-            aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
-            onClick={toggleTheme}
-          >
-            {dark ? <Sun size={19} /> : <Moon size={19} />}
-          </button>
-        </header>
-        <main id="main">
-          <Routes>
-            <Route path="/" element={<Foundation />} />
-            <Route path="/roadmap" element={<Roadmap />} />
-            <Route
-              path="*"
-              element={
-                <section className="roadmap">
-                  <h1>Page not found</h1>
-                  <Link to="/">Return to workspace</Link>
-                </section>
-              }
-            />
-          </Routes>
-        </main>
-        <footer>
-          <span>WebRchat © {year}</span>
-          <span>Less distance. More conversation.</span>
-          <span className="footer-note">FOUNDATION RELEASE</span>
-        </footer>
-      </div>
+      <AuthBootstrap>
+        <div className={dark ? "app theme-dark" : "app"}>
+          <a className="skip-link" href="#main">
+            Skip to content
+          </a>
+          <header>
+            <Link className="brand" to="/">
+              <span className="brand-icon">
+                <MessageCircle size={22} />
+              </span>
+              WebRchat<span className="brand-dot">.</span>
+            </Link>
+            <AccountNav />
+            <nav aria-label="Main navigation">
+              <Link to="/">Workspace</Link>
+              <Link to="/roadmap">Roadmap</Link>
+            </nav>
+            <button
+              className="theme-button"
+              aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+              onClick={toggleTheme}
+            >
+              {dark ? <Sun size={19} /> : <Moon size={19} />}
+            </button>
+          </header>
+          <main id="main">
+            <Routes>
+              <Route path="/" element={<Foundation />} />
+              <Route element={<GuestOnly />}>
+                <Route path="/login" element={<SignIn key="login" />} />
+                <Route
+                  path="/register"
+                  element={<SignIn key="register" register />}
+                />
+              </Route>
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route element={<Protected />}>
+                <Route path="/verify-email" element={<VerifyEmail />} />
+                <Route path="/settings" element={<Settings />} />
+              </Route>
+              <Route element={<Protected verified />}>
+                <Route path="/app" element={<Account />} />
+              </Route>
+              <Route element={<Protected verified admin />}>
+                <Route path="/admin" element={<AdminAccess />} />
+              </Route>
+              <Route path="/roadmap" element={<Roadmap />} />
+              <Route
+                path="*"
+                element={
+                  <section className="roadmap">
+                    <h1>Page not found</h1>
+                    <Link to="/">Return to workspace</Link>
+                  </section>
+                }
+              />
+            </Routes>
+          </main>
+          <footer>
+            <span>WebRchat © {year}</span>
+            <span>Less distance. More conversation.</span>
+            <span className="footer-note">ACCOUNT RELEASE</span>
+          </footer>
+        </div>
+      </AuthBootstrap>
     </BrowserRouter>
   );
 }

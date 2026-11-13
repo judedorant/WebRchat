@@ -1,8 +1,15 @@
 # WebRchat
 
-A Laravel 13 + React/TypeScript real-time chat project. **Phase 1 only**: architecture, Docker, database schema, frontend workspace and initial smoke tests. Accounts, private conversations and real-time chat are intentionally deferred to later phases.
+A Laravel 13 + React/TypeScript real-time chat project. **Phases 1–2**: Docker infrastructure, normalized schema, responsive foundation UI, cookie-based authentication, email verification/recovery, profiles, revocable sessions and role-based access. The chat dashboard and messaging are deferred to later phases.
 
 ## Quick start
+
+For a new local checkout:
+
+```bash
+git clone https://github.com/judedorant/WebRchat.git
+cd WebRchat
+```
 
 Prerequisites: Docker Engine / Docker Desktop with Compose v2, curl, Bash and Git. Allow approximately 4 GB RAM and several GB of disk for images/builds. No host PHP or Node installation is required with Docker.
 
@@ -13,13 +20,13 @@ cp backend/.env.example backend/.env
 ./scripts/setup.sh
 ```
 
-The script builds images, installs locked PHP dependencies, generates a missing local app key, migrates MySQL, seeds the role vocabulary and starts all seven services. It does not reset data or regenerate an existing key. Subsequent starts:
+The script builds images, installs locked PHP dependencies, generates a missing local app key, migrates MySQL, seeds the role vocabulary and starts all eight development services. It does not reset data or regenerate an existing key. Subsequent starts:
 
 ```bash
 docker compose up -d --wait
 ```
 
-Open the frontend on port **5173**, API/Nginx on port **8080**, Reverb on port **8081**. Ports bind to loopback for local development. These are local development ports, not cloud preview links. The UI checks `/api/v1/health` through Vite's proxy; the response is `503` when MySQL or Redis is unavailable, otherwise `200` with `{ "data": { "status": "ok", "service": "WebRchat API", "checks": { "database": "ready", "cache": "ready" } } }`. `/up` is Laravel's lighter framework liveness route. No authentication or chat API is implemented.
+Open the frontend on port **5173**, API/Nginx on port **8080**, Reverb on port **8081**. Ports bind to loopback for local development. These are local development ports, not cloud preview links. The UI checks `/api/v1/health` through Vite's proxy; the response is `503` when MySQL or Redis is unavailable, otherwise `200` with `{ "data": { "status": "ok", "service": "WebRchat API", "checks": { "database": "ready", "cache": "ready" } } }`. `/up` is Laravel's lighter framework liveness route. Authentication/profile APIs are implemented; chat APIs are not. Use **Get started** to register and the local Mailpit inbox on port **8026** to verify your email. See [authentication](docs/authentication.md) for the complete account workflow.
 
 ```bash
 ./scripts/verify.sh
@@ -27,7 +34,7 @@ Open the frontend on port **5173**, API/Nginx on port **8080**, Reverb on port *
 cd frontend
 npm ci
 npx playwright install chromium
-E2E_BASE_URL=http://127.0.0.1:5173 npm run test:e2e
+E2E_BASE_URL=http://localhost:5173 npm run test:e2e
 ```
 
 On a machine with system Chromium, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium` instead of downloading a browser. For custom Reverb keys/ports, set `E2E_REVERB_URL` to the WebSocket URL containing your public app key. Playwright verifies a real Reverb handshake as well as the frontend. Playwright assertions require a real healthy API; they do not mock the network. Backend PHPUnit uses isolated in-memory SQLite for fast schema tests; also run the MySQL integration check below. Never point destructive test operations at the development or production database.
@@ -82,6 +89,6 @@ docs/architecture.md     Boundaries, data model, privacy and phased roadmap
 docs/deployment.md       Release procedure and remaining launch requirements
 ```
 
-Sanctum, Reverb and Redis support are infrastructure prerequisites. No application WebSocket channel is authorized yet. Roles are seeded without passwords or admin accounts. Full demo data is deferred until message behavior exists and will be restricted to development/testing.
+Sanctum cookie authentication and queued verification/recovery mail are implemented. No application WebSocket channel is authorized yet. Roles are seeded without passwords or admin accounts; use the documented CLI grant for an existing verified account. Full demo messaging data is deferred until message behavior exists and will be restricted to development/testing.
 
-See [architecture](docs/architecture.md), [deployment](docs/deployment.md) and [validation results](docs/validation.md). Finish Phase 1 review before implementing Phase 2.
+See [architecture](docs/architecture.md), [deployment](docs/deployment.md) and [validation results](docs/validation.md). Phase 2 is implemented. Phase 3 (chat dashboard/navigation) awaits approval.

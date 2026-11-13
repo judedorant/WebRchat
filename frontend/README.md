@@ -12,4 +12,4 @@ npm test
 npm run lint
 ```
 
-The API and Redis/MySQL services must be running for live health checks. `npm run test:e2e` requires the API and Reverb; see the root README for browser installation and port settings. Unit tests mock the health transport; browser tests use the real services. This release provides the foundation workspace only; the chat dashboard belongs to Phase 3.
+The API and Redis/MySQL services must be running for live health checks. `npm run test:e2e` requires the API and Reverb; see the root README for browser installation and port settings. Unit tests mock the health transport; browser tests use the real services. This release provides the foundation workspace, authentication, verification/recovery, profile settings, sessions and role guards. See docs/authentication.md for the local email workflow. The chat dashboard belongs to Phase 3.

@@ -1,6 +1,6 @@
-# WebRchat architecture · Phase 1
+# WebRchat architecture · Phases 1–2
 
-This release is the runnable foundation, not a completed chat product. Authentication and chat routes intentionally do not exist yet. No messages, identities, or contact lists shown by the UI are fabricated. The workspace reports actual API readiness.
+This release includes the runnable foundation and account system, not a completed chat product. Chat routes do not exist yet. See authentication.md for the implemented Phase 2 design. No messages, identities, or contact lists shown by the UI are fabricated. The workspace reports actual API readiness.
 
 ## Boundaries
 
@@ -16,7 +16,7 @@ flowchart LR
     Browser -. later phases: Echo .-> Reverb
 ```
 
-The Vite development server proxies `/api` and `/sanctum` to Nginx. Production serves compiled React assets and forwards those paths to PHP-FPM. This keeps the intended Sanctum SPA authentication same-origin. Axios sends cookies and the XSRF header; there are no bearer tokens or authentication values in browser storage. Session cookies are HTTP-only and use SameSite=Lax; HTTPS deployments must enable secure cookies. Phase 2 will add CSRF initialization, auth endpoints, verification, policies, protected routes and login throttles.
+The Vite development server proxies `/api` and `/sanctum` to Nginx. Production serves compiled React assets and forwards those paths to PHP-FPM. This keeps the intended Sanctum SPA authentication same-origin. Axios sends cookies and the XSRF header; there are no bearer tokens or authentication values in browser storage. Session cookies are HTTP-only and use SameSite=Lax; HTTPS deployments must enable secure cookies. Phase 2 implements CSRF initialization, auth endpoints, verification, policies, protected routes and login throttles.
 
 Backend structure uses Laravel's standard application, HTTP, model, policy, event and job boundaries. Add domain actions/services when a use case needs a transaction rather than introducing empty abstractions. Frontend transport is in `src/lib`, preferences in `src/store`, and routes in `src/App.tsx`. Move feature code into feature directories as those phases are implemented.
 
@@ -37,6 +37,7 @@ Sanctum, Reverb and Predis are installed as infrastructure. Reverb accepts no ap
 | user_reports | Reported user/message reference, reporter, review state and assigned moderator |
 | notifications | Laravel database notification shape with explicit user FK |
 | audit_logs | Actor, action, subject identifier, metadata, request ID; no default message content |
+| user_sessions | Revocable device references, expiry, activity and user ownership; Redis session IDs are not exposed |
 | platform_settings | Typed JSON values for future admin-managed settings |
 
 Laravel's password reset, sessions, jobs, failed jobs and cache tables support infrastructure. Sanctum's token migration is supplied by the package but Phase 2 will use SPA cookies. No public attachment symlink is created. Database checks enforce ordered direct pairs and matching direct/group structure. Reply references use a composite FK so replies cannot cross conversations. MySQL migration tests are required because SQLite cannot represent every MySQL behavior.
@@ -45,11 +46,11 @@ Soft deletes preserve references. Hard-deletion/retention workflows must deliber
 
 ## Privacy and moderation
 
-Administrators must not receive implicit membership or arbitrary message-read privileges. A future report permits a moderator to review only the specifically reported content through an audited, report-scoped policy. Record moderator, report ID, action, reason and time; limit retention and avoid copying entire conversations to audit metadata. Resolve report state with an explicit action. Private channels, downloads, edits and deletions must authorize independently. Suspension revokes sessions and prevents writes in Phase 2/9.
+Administrators must not receive implicit membership or arbitrary message-read privileges. A future report permits a moderator to review only the specifically reported content through an audited, report-scoped policy. Record moderator, report ID, action, reason and time; limit retention and avoid copying entire conversations to audit metadata. Resolve report state with an explicit action. Private channels, downloads, edits and deletions must authorize independently. Suspension revokes sessions and prevents writes in Phase 9.
 
 ## Subsequent phases
 
-2. Authentication, profiles, roles, verification, recovery and session management.
+2. **Implemented:** authentication, profiles, roles, verification, recovery and session management.
 3. Responsive chat dashboard, navigation and user-facing loading/empty/error states.
 4. Authorized direct messaging, REST Resources/Form Requests, idempotency, cursors.
 5. Authorized private/presence channels, Echo, delivery, typing, reconnect/retry and receipts.

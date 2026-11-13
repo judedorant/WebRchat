@@ -1,6 +1,6 @@
 # Run WebRchat on Windows with Docker Desktop
 
-This guide runs the project on your own Windows computer. Phase 1 provides a foundation page; login and messaging are not implemented yet. You do not need to install PHP, Composer, Node, MySQL or Redis on Windows.
+This guide runs the project on your own Windows computer. Phases 1–2 provide a foundation page, registration/login, verification/recovery, profiles and sessions. Messaging is not implemented yet. You do not need to install PHP, Composer, Node, MySQL or Redis on Windows.
 
 ## 1. Install WSL 2
 
@@ -36,7 +36,7 @@ The first two commands should print version numbers; `docker info` must reach th
 
 ## 3. Download the project ZIP
 
-Save `WebRchat-phase1.zip` from this chat into your Windows **Downloads** folder. The ZIP contains source code and example configuration, not cloud secrets, installed dependencies or databases. The generated project has not been pushed to GitHub, so cloning the original empty repository will not retrieve these files.
+On https://github.com/judedorant/WebRchat choose **Code → Download ZIP** and save `WebRchat-main.zip` in your Windows **Downloads** folder. The ZIP contains source code and example configuration, not cloud secrets, installed dependencies or databases. The project source is now available on GitHub.
 
 ## 4. Extract into Ubuntu
 
@@ -51,8 +51,8 @@ mkdir -p ~/projects
 Find your Windows username by opening `C:\Users` in File Explorer. Replace `WINDOWS_USERNAME` below with the appropriate folder name. If Downloads is elsewhere, use its actual path. Quotes handle spaces in your username.
 
 ```bash
-unzip "/mnt/c/Users/WINDOWS_USERNAME/Downloads/WebRchat-phase1.zip" -d ~/projects
-cd ~/projects/WebRchat
+unzip "/mnt/c/Users/WINDOWS_USERNAME/Downloads/WebRchat-main.zip" -d ~/projects
+cd ~/projects/WebRchat-main
 ls
 ```
 
@@ -63,7 +63,7 @@ You should see `backend`, `frontend`, `compose.yaml`, `scripts` and `README.md`.
 Still in Ubuntu, run:
 
 ```bash
-cd ~/projects/WebRchat
+cd ~/projects/WebRchat-main
 bash scripts/setup.sh
 ```
 
@@ -79,7 +79,7 @@ In your regular Windows browser, enter:
 http://localhost:5173
 ```
 
-You should see the WebRchat foundation workspace and **API connected**. The API health endpoint is `http://localhost:8080/api/v1/health`. You can check it from Ubuntu:
+You should see the WebRchat workspace and **API connected**. Select **Get started** to register. Open `http://localhost:8026` for the local inbox, follow the verification email link, and press **Verify email address**. The API health endpoint is `http://localhost:8080/api/v1/health`. You can check it from Ubuntu:
 
 ```bash
 curl --fail http://localhost:8080/api/v1/health
@@ -95,9 +95,9 @@ Run in Ubuntu from the project folder:
 bash scripts/verify.sh
 ```
 
-Expected checks: 9 backend tests, MySQL schema constraints, queue job processing, API readiness, TypeScript/Vite build, 2 frontend tests and lint. This script does not run browser tests; the main README documents the separate Playwright workflow.
+Expected checks: 34 backend tests, MySQL schema constraints, queue job processing, API readiness, TypeScript/Vite build, 8 frontend tests and lint. This script does not run browser tests; the main README documents the separate Playwright workflow.
 
-To inspect all seven services:
+To inspect all eight development services:
 
 ```bash
 docker compose ps
@@ -114,14 +114,14 @@ docker compose logs --tail=100 backend mysql redis nginx reverb queue frontend
 Stop the app without deleting your data:
 
 ```bash
-cd ~/projects/WebRchat
+cd ~/projects/WebRchat-main
 docker compose stop
 ```
 
 Next time, start Docker Desktop, open Ubuntu and run:
 
 ```bash
-cd ~/projects/WebRchat
+cd ~/projects/WebRchat-main
 export LOCAL_UID="$(id -u)" LOCAL_GID="$(id -g)"
 docker compose up -d --wait
 ```
@@ -131,10 +131,10 @@ Then open `http://localhost:5173` in Windows again. Do not use `docker compose d
 ## Troubleshooting
 
 - **Cannot connect to Docker:** start Docker Desktop, wait for the engine, and enable Ubuntu under WSL Integration.
-- **ZIP not found:** check the filename, Windows username and actual Downloads location. The Linux path `/workspace/WebRchat` exists only in the cloud; locally use `~/projects/WebRchat`.
-- **Port already allocated:** stop another application using ports 5173, 8080 or 8081, or configure alternate ports. Root `.env` supports `FRONTEND_PORT` and `APP_PORT`; Reverb's published port is in `compose.yaml`.
+- **ZIP not found:** check the filename, Windows username and actual Downloads location. The Linux path `/workspace/WebRchat` exists only in the cloud; locally use `~/projects/WebRchat-main`.
+- **Port already allocated:** stop another application using ports 5173, 8080 or 8081, or configure alternate ports. Root `.env` supports `FRONTEND_PORT` and `APP_PORT`; Reverb's published port is in `compose.yaml`. If the frontend port changes, also update APP_URL, FRONTEND_URL and SANCTUM_STATEFUL_DOMAINS in `backend/.env`, then recreate the services.
 - **Browser cannot connect:** check `docker compose ps`, confirm setup finished, and confirm you are opening the browser on the same computer running Docker Desktop.
 - **API unavailable:** inspect the backend, MySQL, Redis and Nginx logs. Both root `.env` and `backend/.env` must use matching MySQL credentials. Changing passwords in `.env` does not change credentials inside an already initialized MySQL volume.
 - **Dependency or image download failed:** check your Internet connection and Docker Desktop's approved proxy/CA settings if required by your organization. Keep TLS and package verification enabled.
 
-The production deployment template requires additional configuration and future security/features work. This guide is for local Phase 1 development.
+The production deployment template requires additional configuration and future security/features work. This guide is for local development.

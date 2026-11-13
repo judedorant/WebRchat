@@ -1,10 +1,19 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import App from "./App";
+import { useAuth } from "./store/auth";
 import { fetchHealth } from "./lib/api";
-vi.mock("./lib/api", () => ({ fetchHealth: vi.fn() }));
+vi.mock("./lib/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./lib/api")>()),
+  fetchHealth: vi.fn(),
+}));
 beforeEach(() => {
   window.history.replaceState({}, "", "/");
+  useAuth.setState({
+    user: null,
+    status: "ready",
+    load: vi.fn().mockResolvedValue(undefined),
+  });
 });
 describe("foundation", () => {
   it("shows verified backend readiness", async () => {
