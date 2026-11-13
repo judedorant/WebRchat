@@ -1,0 +1,18 @@
+# Optional build-time CA trust for the managed Cloud HTTPS proxy.
+# Use: docker compose -f compose.yaml -f compose.cloud.yaml build
+services:
+  backend:
+    build:
+      secrets: [proxy_ca]
+  frontend:
+    build:
+      secrets: [proxy_ca]
+  queue:
+    build:
+      secrets: [proxy_ca]
+  reverb:
+    build:
+      secrets: [proxy_ca]
+secrets:
+  proxy_ca:
+    file: /etc/ssl/certs/ca-certificates.crt

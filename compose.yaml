@@ -1,0 +1,109 @@
+name: ${COMPOSE_PROJECT_NAME:-webrchat}
+x-php: &php
+  image: webrchat-php:dev
+  build:
+    context: .
+    dockerfile: docker/php/Dockerfile
+    target: development
+  user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+  restart: unless-stopped
+  working_dir: /var/www/html
+  volumes:
+    - ./backend:/var/www/html
+  env_file: ./backend/.env
+  depends_on:
+    mysql:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+services:
+  backend:
+    <<: *php
+    healthcheck:
+      test: [CMD, php, artisan, app:health]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: development
+    ports:
+      - '127.0.0.1:${FRONTEND_PORT:-5173}:5173'
+    environment:
+      API_PROXY_TARGET: http://nginx
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:5173').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      nginx:
+        condition: service_started
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-webrchat}
+      MYSQL_USER: ${MYSQL_USER:-webrchat}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Copy .env.example to .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: [CMD-SHELL, 'MYSQL_PWD="$$MYSQL_PASSWORD" mysql --user="$$MYSQL_USER" --database="$$MYSQL_DATABASE" --execute="SELECT 1" >/dev/null 2>&1']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+  redis:
+    image: redis:7.4-alpine
+    command: [redis-server, --appendonly, 'yes']
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  reverb:
+    <<: *php
+    command: [php, artisan, 'reverb:start', --host=0.0.0.0, --port=8080]
+    ports:
+      - '127.0.0.1:8081:8080'
+    healthcheck:
+      test: [CMD, php, -r, "exit(@fsockopen('127.0.0.1',8080)?0:1);"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+  queue:
+    <<: *php
+    command: [php, artisan, 'queue:work', --sleep=1, --tries=3, --timeout=60, --max-time=3600]
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, php, artisan, 'queue:monitor', 'redis:default', --max=100]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+  nginx:
+    image: nginx:1.28-alpine
+    ports:
+      - '127.0.0.1:${APP_PORT:-8080}:80'
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      backend:
+        condition: service_started
+    healthcheck:
+      test: [CMD, wget, -Y, "off", -q, --spider, 'http://127.0.0.1/api/v1/health']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+volumes:
+  mysql_data:
+  redis_data:
+  frontend_node_modules:
