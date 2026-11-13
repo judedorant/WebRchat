@@ -4,7 +4,7 @@
 
 Run `bash scripts/setup.sh` from the project root. Open `http://localhost:5173`, choose **Get started**, and register. Development email is delivered by the Redis queue worker to the local **Mailpit inbox on port 8026**. Open `http://localhost:8026` in the same computer's browser, open the verification email, follow its link and press **Verify email address**. Use the same hostname throughout: the example configuration uses `localhost`, not a mixture of localhost and 127.0.0.1.
 
-After verification, `/app` shows the account workspace; `/settings` supports name, email, bio, password and session management. Changing email requires the current password, clears verification, sends a new verification email and signs out other sessions. Password changes preserve the current session and revoke other sessions. Password reset invalidates all sessions for that account. Verify/sign-in links return to the original internal account route where applicable.
+After verification, `/app` shows the Phase 3 chat workspace (empty by default, with an optional fictional design preview); `/settings` supports name, email, bio, password and session management. Changing email requires the current password, clears verification, sends a new verification email and signs out other sessions. Password changes preserve the current session and revoke other sessions. Password reset invalidates all sessions for that account. Verify/sign-in links return to the original internal account route where applicable.
 
 For an existing Phase 1 installation, `setup.sh` intentionally preserves your `.env` files. To use the local inbox, set these non-secret development options in `backend/.env` and recreate the services:
 
@@ -44,7 +44,7 @@ All routes use `/api/v1`. API responses remain JSON even when the caller omits `
 | GET | /users/{id} | Verified active session + view policy |
 | GET | /admin/access | Verified active admin; access confirmation only |
 
-No chat/conversation endpoints or moderation dashboard are included yet. Public user resources expose only ID, name, bio and an avatar placeholder; email and roles are included only for the requester themselves. Suspended/unverified/deleted users are excluded from the directory. Bio is plain text, rendered through React's normal escaping. Image/profile uploads belong to Phase 7.
+No persistent chat/conversation endpoints or moderation dashboard are included yet. The Phase 3 chat UI is documented in dashboard.md. Public user resources expose only ID, name, bio and an avatar placeholder; email and roles are included only for the requester themselves. Suspended/unverified/deleted users are excluded from the directory. Bio is plain text, rendered through React's normal escaping. Image/profile uploads belong to Phase 7.
 
 ## Cookie and session design
 

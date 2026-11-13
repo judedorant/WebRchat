@@ -1,6 +1,6 @@
-# WebRchat architecture · Phases 1–2
+# WebRchat architecture · Phases 1–3
 
-This release includes the runnable foundation and account system, not a completed chat product. Chat routes do not exist yet. See authentication.md for the implemented Phase 2 design. No messages, identities, or contact lists shown by the UI are fabricated. The workspace reports actual API readiness.
+This release includes the runnable foundation, account system and responsive chat workspace, not a completed chat product. Chat routes do not exist yet. See authentication.md for the implemented Phase 2 design. No messages, identities, or contact lists shown by the UI are fabricated. The workspace reports actual API readiness.
 
 ## Boundaries
 
@@ -51,7 +51,7 @@ Administrators must not receive implicit membership or arbitrary message-read pr
 ## Subsequent phases
 
 2. **Implemented:** authentication, profiles, roles, verification, recovery and session management.
-3. Responsive chat dashboard, navigation and user-facing loading/empty/error states.
+3. **Implemented:** responsive chat dashboard, navigation and loading/empty/error states; opt-in fictional preview and unsent real-contact drafts. See dashboard.md.
 4. Authorized direct messaging, REST Resources/Form Requests, idempotency, cursors.
 5. Authorized private/presence channels, Echo, delivery, typing, reconnect/retry and receipts.
 6. Groups, owners/admins, membership transitions and notifications.

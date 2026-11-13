@@ -1,6 +1,6 @@
 # Run WebRchat on Windows with Docker Desktop
 
-This guide runs the project on your own Windows computer. Phases 1–2 provide a foundation page, registration/login, verification/recovery, profiles and sessions. Messaging is not implemented yet. You do not need to install PHP, Composer, Node, MySQL or Redis on Windows.
+This guide runs the project on your own Windows computer. Phases 1–3 provide a responsive chat workspace, registration/login, verification/recovery, profiles and sessions. Messaging is not implemented yet. You do not need to install PHP, Composer, Node, MySQL or Redis on Windows.
 
 ## 1. Install WSL 2
 
@@ -79,7 +79,7 @@ In your regular Windows browser, enter:
 http://localhost:5173
 ```
 
-You should see the WebRchat workspace and **API connected**. Select **Get started** to register. Open `http://localhost:8026` for the local inbox, follow the verification email link, and press **Verify email address**. The API health endpoint is `http://localhost:8080/api/v1/health`. You can check it from Ubuntu:
+You should see the WebRchat workspace and **API connected**. Select **Get started** to register. Open `http://localhost:8026` for the local inbox, follow the verification email link, and press **Verify email address**. After verification you can explore the dashboard: its conversation list starts empty, **Explore design preview** shows fictional chats, and **New message** finds verified people for an unsent draft. Sending is not implemented yet. The API health endpoint is `http://localhost:8080/api/v1/health`. You can check it from Ubuntu:
 
 ```bash
 curl --fail http://localhost:8080/api/v1/health
@@ -95,7 +95,7 @@ Run in Ubuntu from the project folder:
 bash scripts/verify.sh
 ```
 
-Expected checks: 34 backend tests, MySQL schema constraints, queue job processing, API readiness, TypeScript/Vite build, 8 frontend tests and lint. This script does not run browser tests; the main README documents the separate Playwright workflow.
+Expected checks: 34 backend tests, MySQL schema constraints, queue job processing, API readiness, TypeScript/Vite build, 20 frontend tests and lint. This script does not run browser tests; the main README documents the separate Playwright workflow.
 
 To inspect all eight development services:
 

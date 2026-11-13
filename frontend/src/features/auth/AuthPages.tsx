@@ -468,44 +468,6 @@ export function VerifyEmail() {
     </AuthCard>
   );
 }
-export function Account() {
-  const user = useAuth((s) => s.user);
-  return (
-    <section className="account-page">
-      <span className="overline">YOUR WEBRCHAT ACCOUNT</span>
-      <h1>Welcome, {user?.name.split(" ")[0]}.</h1>
-      <p>Your email is verified and your account is ready.</p>
-      <div className="account-grid">
-        <article className="card">
-          <ShieldCheck size={24} />
-          <h2>Make it yours.</h2>
-          <p>
-            Update your profile, secure your account, and review active
-            sessions.
-          </p>
-          <Link className="card-link" to="/settings">
-            Account settings <ArrowRight size={16} />
-          </Link>
-        </article>
-        <article className="card">
-          <h2>Conversations are next.</h2>
-          <p>
-            The chat dashboard and messaging arrive in later phases. Your secure
-            account is the foundation.
-          </p>
-          <Link className="card-link" to="/roadmap">
-            View the roadmap <ArrowRight size={16} />
-          </Link>
-        </article>
-      </div>
-      {user?.roles.includes("admin") && (
-        <Link className="outline-button" to="/admin">
-          Administration
-        </Link>
-      )}
-    </section>
-  );
-}
 export function AdminAccess() {
   const [state, setState] = useState("Checking server authorization…");
   useEffect(() => {

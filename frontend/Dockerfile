@@ -12,5 +12,7 @@ FROM development AS build
 RUN npm run build
 FROM nginx:1.28-alpine AS production
 COPY --from=build /app/dist /usr/share/nginx/html
+# Public artifacts must remain readable even when the checkout has a restrictive umask.
+RUN chmod -R a+rX /usr/share/nginx/html
 COPY docker/nginx/production.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80

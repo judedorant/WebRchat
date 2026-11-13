@@ -1,75 +1,7 @@
-import {
-  test,
-  expect,
-  type APIRequestContext,
-  type Page,
-} from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import { randomUUID } from "node:crypto";
-
-// Keep this origin identical to FRONTEND_URL / APP_URL used in notification links.
-const site = process.env.E2E_AUTH_BASE_URL || "http://localhost:5173";
-const inbox = process.env.E2E_MAILPIT_URL || "http://127.0.0.1:8026";
-if (
-  ![site, inbox].every((url) =>
-    ["localhost", "127.0.0.1"].includes(new URL(url).hostname),
-  )
-) {
-  throw new Error(
-    "Account lifecycle tests are restricted to local development services.",
-  );
-}
+import { site, emailLink, login } from "./helpers/accounts";
 test.use({ baseURL: site });
-
-async function emailLink(
-  request: APIRequestContext,
-  email: string,
-  path: string,
-): Promise<string> {
-  let link = "";
-  await expect
-    .poll(
-      async () => {
-        const listing = await request.get(`${inbox}/api/v1/messages`);
-        if (!listing.ok()) return false;
-        const data = await listing.json();
-        for (const item of data.messages || []) {
-          if (
-            !(item.To || []).some(
-              (to: { Address: string }) => to.Address === email,
-            )
-          )
-            continue;
-          const message = await (
-            await request.get(`${inbox}/api/v1/message/${item.ID}`)
-          ).json();
-          const matches = String(message.HTML || "").matchAll(
-            /href="(https?:[^"]+)"/g,
-          );
-          for (const match of matches) {
-            const candidate = match[1].replaceAll("&amp;", "&");
-            if (new URL(candidate).pathname === path) {
-              link = candidate;
-              return true;
-            }
-          }
-        }
-        return false;
-      },
-      {
-        timeout: 20000,
-        message: "Expected a queued email in the local Mailpit inbox",
-      },
-    )
-    .toBe(true);
-  return link;
-}
-async function login(page: Page, email: string, password: string) {
-  await page.goto("/login");
-  await page.getByLabel("Email address", { exact: true }).fill(email);
-  await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page).toHaveURL(/\/app$/);
-}
 
 test("cookie-based account lifecycle, queued email, profile, session revocation and password recovery", async ({
   page,
@@ -112,9 +44,11 @@ test("cookie-based account lifecycle, queued email, profile, session revocation 
   ).toBeVisible();
   await page.getByRole("link", { name: "Continue to your account" }).click();
   await expect(
-    page.getByRole("heading", { name: "Welcome, Alex." }),
+    page.getByRole("heading", { name: "Messages", exact: true }),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Settings", exact: true }).click();
+  await page
+    .getByRole("link", { name: "Account settings", exact: true })
+    .click();
   await page.getByLabel("Full name", { exact: true }).fill("Alex Updated");
   await page
     .getByLabel("About you", { exact: true })

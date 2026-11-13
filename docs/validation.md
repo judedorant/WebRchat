@@ -1,21 +1,22 @@
-# Validation results · Phases 1–2
+# Validation results · Phases 1–3
 
 Executed in the current managed cloud instance on 2026-11-13. Results describe the development workflow and image builds, not a deployed production service or a restored fresh-task snapshot.
 
 | Check | Result |
 | --- | --- |
 | PHP / framework | PHP 8.4 Docker toolchain; Laravel 13.42.0; locked Composer dependencies |
-| Compose development | Eight services: backend, frontend, MySQL 8.4, Redis, Reverb, queue, Nginx and development Mailpit |
+| Compose development | Eight services healthy: backend, frontend, MySQL 8.4, Redis, Reverb, queue, Nginx and development Mailpit |
 | Reusable setup | `CLOUD_PROXY_TRUST=1 bash scripts/setup.sh` passed, preserving the application key, existing environment files and data |
 | PHPUnit | 34 backend tests; authentication/authorization and existing health/schema checks |
-| Vitest / React Testing Library | 8 tests: health success/failure, guest and verification guards, admin denial, login transport/errors and unsafe verification URL rejection |
-| Playwright / Chromium | 4 tests: foundation/navigation/theme/mobile; real Reverb handshake; complete account lifecycle; real CSRF denial |
+| Vitest / React Testing Library | 20 tests: existing authentication/health checks plus opt-in dashboard preview, filters/unread state, unsent drafts, group/image details, directory paging/retry/stale responses, invalid routes, admin navigation and identity isolation |
+| Playwright / Chromium | 8 tests: existing foundation, Reverb, complete authentication lifecycle and CSRF checks, plus four desktop/mobile dashboard, real directory, modal keyboard/focus and account-switch privacy checks |
 | Account lifecycle | Real cookies, MySQL, Redis queue and SMTP/Mailpit used for signup, signed verification, profile edit, login/logout, password change, second-browser revocation and email-based recovery |
 | MySQL constraints | Duplicate/reversed direct pairs, duplicate sender UUID, cross-conversation replies and self-blocks rejected; valid reply accepted; diagnostic rows rolled back |
 | Queue | A real queued job processed and its cache result checked; verification/reset notifications delivered through the worker |
 | Frontend | TypeScript/Vite production build passed; Oxlint passed |
 | PHP style | Laravel Pint check passed |
-| Production artifacts | Backend and compiled frontend/Nginx images built; production Compose configuration parsed successfully |
+| Production artifacts | Backend image retained from Phase 2; updated frontend/Nginx image built; production Compose parsed successfully |
+| Production frontend component smoke | Temporary image container on the development network: real SPA deep links, all three SVG assets, API health proxy, protected-route sign-in rendering and `/ws/app/{key}` WebSocket handshake passed; temporary container removed |
 
 Phase 1 also validated SQLite migrate/rollback/reapply and Redis outage HTTP 503/recovery. The Phase 2 session migration ran on MySQL and is exercised by the isolated SQLite feature suite. No message delivery, typing, read receipts, moderation or application-channel authorization is claimed by a Reverb transport handshake.
 
@@ -37,10 +38,17 @@ JSON handling is forced for API middleware as well as exception rendering. This 
 - Reverb needs its restart policy to recover from cache-backed restart-marker changes after Redis restart.
 - The Laravel 13 cookie name uses a hyphen; the browser assertion now checks the actual configured default name rather than an obsolete underscore convention.
 
+## Phase 3 findings resolved
+
+- The old production `/app/` WebSocket location collided with dashboard deep links. Public gateway WebSocket traffic now uses `/ws/`, rewritten to Reverb's `/app/{key}` endpoint; UI routes retain `/app/conversations/*`. Server-side event publishing remains on the private Reverb service.
+- Restrictive checkout permissions propagated to public SVG files. The production frontend image grants read/traverse access only to the intended public artifact directory, so Nginx can serve images and bundles.
+- Modal close needed explicit restoration to its trigger, and Escape must not also close the details panel behind an open modal. An explicit Tab/Shift+Tab wrap complements native dialog behavior. These were checked in real Chromium, including repeated Tab traversal on mobile.
+- A stale user-search response could overwrite a newer query without a post-response cancellation check. Cancellation is now checked before applying either initial or paginated directory results; a deferred-response regression test verifies this.
+
 ## Limits and remaining work
 
-The chat dashboard starts in Phase 3. Message APIs, real-time application channels, groups, private uploads, search/notifications, admin moderation and the full security/load/deployment phase remain future work. Avatar upload is not part of Phase 2.
+The Phase 3 dashboard is implemented with an empty default inbox, an opt-in fictional design preview and unsent real-contact drafts. See dashboard.md. Persistent message APIs, real-time application channels, group actions, private uploads, server-side message search/notifications, admin moderation and the full security/load/deployment phase remain future work. Avatar upload is not part of Phase 2.
 
-No real production SMTP, TLS ingress, production runtime, backups/restore, load testing or fresh-task snapshot restoration has been validated. The production template requires genuine secrets, SMTP and correctly trusted ingress/IP/HTTPS forwarding. Mailpit and synthetic `e2e-<uuid>@example.test` account/mail fixtures are development-only. No privileged account or complete demo dataset is seeded.
+No real production SMTP, TLS ingress, complete production-stack runtime, backups/restore, load testing or fresh-task snapshot restoration has been validated. The production frontend smoke used development API/Reverb dependencies and does not establish a full production deployment. The production template requires genuine secrets, SMTP and correctly trusted ingress/IP/HTTPS forwarding. Mailpit and synthetic `e2e-<uuid>@example.test` account/mail fixtures are development-only. No privileged account or complete demo dataset is seeded.
 
-Phase 1 was pushed to the GitHub main branch as a separate initial commit. Phase 2 is kept in a subsequent commit so both milestones remain reviewable. Local .env files, installed dependencies, databases and runtime outputs are excluded from Git. Reusable environment settings are a draft; review/save/publish through the environment UI to update future task snapshots.
+Phase 1 was pushed to the GitHub main branch as a separate initial commit. Phases 2 and 3 are kept in subsequent commits so each milestone remains reviewable. Local .env files, installed dependencies, databases and runtime outputs are excluded from Git. Reusable environment settings are a draft; review/save/publish through the environment UI to update future task snapshots.

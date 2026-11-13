@@ -1,6 +1,6 @@
 # WebRchat
 
-A Laravel 13 + React/TypeScript real-time chat project. **Phases 1–2**: Docker infrastructure, normalized schema, responsive foundation UI, cookie-based authentication, email verification/recovery, profiles, revocable sessions and role-based access. The chat dashboard and messaging are deferred to later phases.
+A Laravel 13 + React/TypeScript real-time chat project. **Phases 1–3**: Docker infrastructure, normalized schema, responsive foundation UI, cookie-based authentication, email verification/recovery, profiles, revocable sessions, role-based access and a responsive chat workspace. Persistent messaging begins in Phase 4.
 
 ## Quick start
 
@@ -26,7 +26,7 @@ The script builds images, installs locked PHP dependencies, generates a missing 
 docker compose up -d --wait
 ```
 
-Open the frontend on port **5173**, API/Nginx on port **8080**, Reverb on port **8081**. Ports bind to loopback for local development. These are local development ports, not cloud preview links. The UI checks `/api/v1/health` through Vite's proxy; the response is `503` when MySQL or Redis is unavailable, otherwise `200` with `{ "data": { "status": "ok", "service": "WebRchat API", "checks": { "database": "ready", "cache": "ready" } } }`. `/up` is Laravel's lighter framework liveness route. Authentication/profile APIs are implemented; chat APIs are not. Use **Get started** to register and the local Mailpit inbox on port **8026** to verify your email. See [authentication](docs/authentication.md) for the complete account workflow.
+Open the frontend on port **5173**, API/Nginx on port **8080**, Reverb on port **8081**. Ports bind to loopback for local development. These are local development ports, not cloud preview links. The UI checks `/api/v1/health` through Vite's proxy; the response is `503` when MySQL or Redis is unavailable, otherwise `200` with `{ "data": { "status": "ok", "service": "WebRchat API", "checks": { "database": "ready", "cache": "ready" } } }`. `/up` is Laravel's lighter framework liveness route. Authentication/profile APIs are implemented; chat APIs are not. Verified accounts enter the dashboard at `/app`; use **Explore design preview** to view fictional sample chats, or **New message** to prepare an unsent draft for a real verified member. See [dashboard behavior](docs/dashboard.md) for the preview boundary. Use **Get started** to register and the local Mailpit inbox on port **8026** to verify your email. See [authentication](docs/authentication.md) for the complete account workflow.
 
 ```bash
 ./scripts/verify.sh
@@ -91,4 +91,4 @@ docs/deployment.md       Release procedure and remaining launch requirements
 
 Sanctum cookie authentication and queued verification/recovery mail are implemented. No application WebSocket channel is authorized yet. Roles are seeded without passwords or admin accounts; use the documented CLI grant for an existing verified account. Full demo messaging data is deferred until message behavior exists and will be restricted to development/testing.
 
-See [architecture](docs/architecture.md), [deployment](docs/deployment.md) and [validation results](docs/validation.md). Phase 2 is implemented. Phase 3 (chat dashboard/navigation) awaits approval.
+See [architecture](docs/architecture.md), [deployment](docs/deployment.md) and [validation results](docs/validation.md). Phases 1–3 are implemented. Phase 4 (persistent direct conversations and messages) awaits approval.
