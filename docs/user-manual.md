@@ -1,5 +1,7 @@
 # WebRchat user manual
 
+[Download the illustrated PDF edition](WebRchat-User-Manual.pdf) for screenshots and a linked contents page.
+
 For the features implemented through Phase 8. This guide covers desktop setup and everyday use. Screens and buttons may move on smaller windows, but the account and privacy rules stay the same.
 
 ## Contents
