@@ -47,7 +47,7 @@ test("desktop preview has searchable routes, group details, image preview and an
         new URL(request.url()).pathname,
       )
     )
-      writes.push(request.method());
+      if (request.method() !== "GET") writes.push(request.method());
   });
   await expect(
     page.getByRole("heading", { name: "Messages", exact: true }),
@@ -129,7 +129,7 @@ test("new-message dialog uses real verified profiles and a reload restores only 
   await expect(page).toHaveURL(/\/app\/conversations\/contact-\d+$/);
   await expect(
     page.getByText(
-      "You can prepare a draft here. No conversation or message has been saved.",
+      "Write your first message to start a private conversation. Messages are saved when you send.",
     ),
   ).toBeVisible();
   await page
@@ -137,7 +137,7 @@ test("new-message dialog uses real verified profiles and a reload restores only 
     .fill("This is not persisted.");
   await expect(
     page.getByRole("button", { name: "Send message", exact: true }),
-  ).toBeDisabled();
+  ).toBeEnabled();
   await page.reload();
   await expect(page.getByLabel("Message draft", { exact: true })).toHaveValue(
     "",
@@ -170,7 +170,9 @@ test("mobile navigation, dark mode, responsive details and dialog keyboard contr
     .getByRole("button", { name: "Design preview", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Maya Chen", exact: true }),
+    page
+      .getByRole("region", { name: "Chat window" })
+      .getByRole("heading", { name: "Maya Chen", exact: true }),
   ).toBeVisible();
   await expect(page.locator(".chat-sidebar")).toBeHidden();
   await page

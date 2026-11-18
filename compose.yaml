@@ -10,6 +10,7 @@ x-php: &php
   working_dir: /var/www/html
   volumes:
     - ./backend:/var/www/html
+    - ./docker/php/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini:ro
   env_file: ./backend/.env
   depends_on:
     mysql:
@@ -44,6 +45,7 @@ services:
       - '127.0.0.1:${FRONTEND_PORT:-5173}:5173'
     environment:
       API_PROXY_TARGET: http://nginx
+      REVERB_PROXY_TARGET: ws://reverb:8080
     volumes:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules

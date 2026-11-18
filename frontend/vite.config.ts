@@ -8,6 +8,11 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
+      "/ws": {
+        target: process.env.REVERB_PROXY_TARGET || "ws://127.0.0.1:8081",
+        ws: true,
+        rewrite: (path) => path.replace(/^\/ws/, ""),
+      },
       "/api": {
         target: process.env.API_PROXY_TARGET || "http://localhost:8000",
       },

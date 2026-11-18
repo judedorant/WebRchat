@@ -144,7 +144,13 @@ test("cookie-based account lifecycle, queued email, profile, session revocation 
         cookie.name === (process.env.E2E_SESSION_COOKIE || "webrchat-session"),
     )?.httpOnly,
   ).toBe(true);
-  expect(await page.evaluate(() => localStorage.length)).toBe(0);
+  expect(
+    await page.evaluate(() =>
+      Object.keys(localStorage).filter(
+        (key) => !/^pusherTransport(TLS|NonTLS)$/.test(key),
+      ),
+    ),
+  ).toEqual([]);
 });
 
 test("login rejects a cookie request without a CSRF token or same-origin fetch metadata", async ({

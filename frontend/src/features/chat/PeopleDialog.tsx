@@ -13,10 +13,17 @@ interface DirectoryPage {
 export function PeopleDialog({
   onClose,
   onSelect,
+  excludeIds = [],
+  title = "New message",
+  description = "Find a verified member and start a private conversation.",
 }: {
+  title?: string;
+  description?: string;
+  excludeIds?: number[];
   onClose: () => void;
   onSelect: (contact: Contact) => void;
 }) {
+  const excludedKey = excludeIds.toSorted((a, b) => a - b).join(",");
   const ownId = useAuth((state) => state.user?.id);
   const [search, setSearch] = useState(""),
     [people, setPeople] = useState<Contact[]>([]),
@@ -38,7 +45,13 @@ export function PeopleDialog({
         })
         .then(({ data }) => {
           if (controller.signal.aborted) return;
-          setPeople(data.data.filter((person) => person.id !== ownId));
+          setPeople(
+            data.data.filter(
+              (person) =>
+                person.id !== ownId &&
+                !excludedKey.split(",").includes(String(person.id)),
+            ),
+          );
           setCursor(data.meta?.next_cursor || null);
         })
         .catch((e) => {
@@ -53,7 +66,7 @@ export function PeopleDialog({
       controller.abort();
       abort.current?.abort();
     };
-  }, [search, ownId, retry]);
+  }, [search, ownId, retry, excludedKey]);
   async function more() {
     if (!cursor || loading) return;
     const controller = new AbortController();
@@ -68,10 +81,14 @@ export function PeopleDialog({
       if (controller.signal.aborted) return;
       setPeople((current) => [
         ...new Map(
-          [...current, ...data.data.filter((p) => p.id !== ownId)].map((p) => [
-            p.id,
-            p,
-          ]),
+          [
+            ...current,
+            ...data.data.filter(
+              (p) =>
+                p.id !== ownId &&
+                !excludedKey.split(",").includes(String(p.id)),
+            ),
+          ].map((p) => [p.id, p]),
         ).values(),
       ]);
       setCursor(data.meta?.next_cursor || null);
@@ -82,11 +99,8 @@ export function PeopleDialog({
     }
   }
   return (
-    <Modal title="New message" onClose={onClose}>
-      <p className="chat-dialog-intro">
-        Find a verified member. You can prepare a draft; sending isn’t available
-        yet.
-      </p>
+    <Modal title={title} onClose={onClose}>
+      <p className="chat-dialog-intro">{description}</p>
       <div className="chat-search">
         <Search size={17} />
         <input

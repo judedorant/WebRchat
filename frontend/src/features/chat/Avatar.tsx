@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Users } from "lucide-react";
 function initials(name: string) {
   return name
@@ -13,15 +14,24 @@ export function Avatar({
   color = "sage",
   size = "",
   group = false,
+  imageUrl,
 }: {
   name: string;
   color?: string;
   size?: string;
   group?: boolean;
+  imageUrl?: string | null;
 }) {
+  const [failed, setFailed] = useState<string | null>(null);
   return (
     <span aria-hidden="true" className={`chat-avatar ${color} ${size}`}>
-      {group ? <Users size={size === "large" ? 29 : 19} /> : initials(name)}
+      {imageUrl && failed !== imageUrl ? (
+        <img src={imageUrl} alt="" onError={() => setFailed(imageUrl)} />
+      ) : group ? (
+        <Users size={size === "large" ? 29 : 19} />
+      ) : (
+        initials(name)
+      )}
     </span>
   );
 }

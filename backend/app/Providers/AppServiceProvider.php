@@ -15,6 +15,11 @@ class AppServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
+        require base_path('routes/channels.php');
+        foreach (['uploads' => 12, 'reactions' => 60, 'notifications' => 120, 'search' => 60, 'safety' => 30, 'reports' => 6, 'groups' => 30, 'group-create' => 6, 'group-images' => 12, 'realtime-auth' => 240, 'realtime-heartbeat' => 12, 'typing' => 120, 'receipts' => 120] as $name => $attempts) {
+            RateLimiter::for($name, fn (Request $request) => Limit::perMinute($attempts)->by((string) $request->user()->id));
+        }
+        RateLimiter::for('messages', fn (Request $request) => Limit::perMinute(60)->by((string) $request->user()->id));
         RateLimiter::for('login', fn (Request $request) => [Limit::perMinute(30)->by($request->ip()), Limit::perMinute(5)->by(Str::lower((string) $request->input('email')).'|'.$request->ip())]);
         RateLimiter::for('registration', fn (Request $request) => Limit::perMinute(5)->by($request->ip()));
         RateLimiter::for('recovery', fn (Request $request) => Limit::perMinute(5)->by($request->ip()));

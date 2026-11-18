@@ -58,7 +58,10 @@ export function Modal({
         }
       }}
       className={`chat-modal ${className}`}
-      onCancel={onClose}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -70,6 +73,7 @@ export function Modal({
             <h2 id={headingId}>{title}</h2>
           </div>
           <button
+            type="button"
             className="chat-icon-button"
             aria-label="Close dialog"
             onClick={onClose}

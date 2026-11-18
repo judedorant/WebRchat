@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
@@ -12,18 +12,17 @@ import {
   LogOut,
   MessageCircle,
   MessagesSquare,
-  Mic,
   Moon,
-  Paperclip,
   Plus,
   Search,
   Send,
   Settings,
   ShieldCheck,
-  Smile,
   Sparkles,
   Sun,
   X,
+  UsersRound,
+  Settings2,
 } from "lucide-react";
 import { api } from "../../lib/api";
 import { errorMessage, mutate } from "../../lib/auth";
@@ -35,27 +34,51 @@ import { Avatar } from "./Avatar";
 import { PeopleDialog } from "./PeopleDialog";
 import { Modal } from "./Modal";
 import type { Contact } from "./types";
+import { useWideScreen } from "./useWideScreen";
+import { useDirectMessaging } from "./useDirectMessaging";
+import { useMessageReceipts, useInboxDelivery } from "./useMessageReceipts";
+const RichComposer = lazy(() =>
+  import("./RichComposer").then((module) => ({ default: module.RichComposer })),
+);
+import { MessageExtras } from "./MessageExtras";
+const ChatTools = lazy(() =>
+  import("./ChatTools").then((module) => ({ default: module.ChatTools })),
+);
+const ReportDialog = lazy(() =>
+  import("./ChatTools").then((module) => ({ default: module.ReportDialog })),
+);
+const BlockButton = lazy(() =>
+  import("./ChatTools").then((module) => ({ default: module.BlockButton })),
+);
+import { GroupUpdates } from "./GroupUpdates";
 import "./chat.css";
-function useWideScreen() {
-  const [wide, setWide] = useState(
-    () => window.matchMedia?.("(min-width: 1280px)").matches ?? false,
-  );
-  useEffect(() => {
-    const query = window.matchMedia?.("(min-width: 1280px)");
-    if (!query) return;
-    const change = () => setWide(query.matches);
-    query.addEventListener("change", change);
-    return () => query.removeEventListener("change", change);
-  }, []);
-  return wide;
-}
+const GroupDialog = lazy(() =>
+  import("./GroupDialog").then((module) => ({ default: module.GroupDialog })),
+);
+const GroupManager = lazy(() =>
+  import("./GroupManager").then((module) => ({ default: module.GroupManager })),
+);
 export function ChatDashboard() {
+  const userId = useAuth((s) => s.user?.id);
+  return <ChatWorkspace key={userId ?? "guest"} />;
+}
+function ChatWorkspace() {
   const user = useAuth((s) => s.user),
     setUser = useAuth((s) => s.setUser);
   const { dark, toggleTheme } = usePreferences(),
     chat = useChat(),
     navigate = useNavigate(),
     { conversationId } = useParams();
+  const [replyDraft, setReplyDraft] = useState<{
+    key?: string;
+    message: import("./useDirectMessaging").SavedMessage;
+  } | null>(null);
+  const [report, setReport] = useState<{
+    target: Contact;
+    messageId?: number;
+  } | null>(null);
+  const [groupOpen, setGroupOpen] = useState(false);
+  const [groupSettingsId, setGroupSettingsId] = useState<number | null>(null);
   const [peopleOpen, setPeopleOpen] = useState(false),
     [helpOpen, setHelpOpen] = useState(false),
     [image, setImage] = useState<{ src: string; alt: string } | null>(null),
@@ -73,14 +96,92 @@ export function ChatDashboard() {
     : undefined;
   const contactId = conversationId?.match(/^contact-([1-9]\d*)$/)?.[1];
   const contact = conversationId ? chat.contacts[conversationId] : undefined;
-  const active = sample || contact;
+  const direct = useDirectMessaging(user?.id, conversationId, chat.preview);
+  const historyRoot = useRef<HTMLDivElement>(null);
+  useMessageReceipts(
+    user?.id,
+    direct.savedId,
+    Boolean(user?.realtime_enabled) && !chat.preview,
+    direct.realtime.status,
+    direct.messages,
+    historyRoot,
+  );
+  useInboxDelivery(
+    user?.id,
+    Boolean(user?.realtime_enabled) && !chat.preview,
+    direct.realtime.status,
+    direct.conversations,
+  );
+  const typing = direct.realtime.indicateTyping;
+  useEffect(() => {
+    const id = direct.savedId;
+    return () => {
+      if (id) void typing(id, false);
+    };
+  }, [direct.savedId, typing]);
+  const live = direct.active;
+  const replyMessage =
+    replyDraft && replyDraft.key === conversationId ? replyDraft.message : null;
+  const liveGroup = live?.type === "group";
+  const typingNames = live
+    ? Object.keys(direct.realtime.typing[live.id] || {})
+        .map(Number)
+        .flatMap(
+          (id) =>
+            live.participants.find((member) => member.id === id)?.name || [],
+        )
+        .slice(0, 3)
+    : [];
+  const peer = live?.participants.find((person) => person.id !== user?.id);
+  const safetyTarget = !sample && !liveGroup ? peer || contact : undefined;
+  const active =
+    sample ||
+    (live
+      ? liveGroup
+        ? {
+            name: live.name || "Group",
+            bio: `${live.participants.length} members`,
+          }
+        : peer || { name: "Unavailable member", bio: null }
+      : contact);
+  const sharedAttachments = direct.messages.flatMap(
+    (message) => message.attachments || [],
+  );
+  const sharedImages = sharedAttachments.filter(
+    (file) => file.kind === "image",
+  );
+  const sharedFiles = sharedAttachments.filter((file) => file.kind !== "image");
+  const routeRef = useRef(conversationId);
+  useEffect(() => {
+    routeRef.current = conversationId;
+  }, [conversationId]);
+  const savedRows = !chat.preview
+    ? direct.conversations
+        .filter(
+          (thread) =>
+            (chat.filter !== "unread" || (thread.unread_count || 0) > 0) &&
+            (chat.filter !== "groups" || thread.type === "group"),
+        )
+        .filter((thread) =>
+          `${thread.name || ""} ${thread.participants.map((person) => person.name).join(" ")} ${thread.latest_message?.body || ""}`
+            .toLowerCase()
+            .includes(chat.search.toLowerCase().trim()),
+        )
+        .toSorted(
+          (a, b) =>
+            (b.last_message_at || b.created_at).localeCompare(
+              a.last_message_at || a.created_at,
+            ) || b.id - a.id,
+        )
+    : [];
   const location = useLocation();
   const lookupKey = `${location.key}:${contactId || ""}`;
   const contactLoading = Boolean(
     contactId && !contact && lookup?.key !== lookupKey,
   );
   const contactError = lookup?.key === lookupKey ? lookup.error : "";
-  const displayError = contactError || error;
+  const displayError =
+    contactError || error || direct.sendError || direct.historyError;
   const hasActive = Boolean(active);
   const setDetails = chat.setDetails;
   const validPreviewId = previewConversations.some(
@@ -92,7 +193,10 @@ export function ChatDashboard() {
           count + (chat.read.includes(thread.id) ? 0 : thread.unread),
         0,
       )
-    : 0;
+    : direct.conversations.reduce(
+        (count, thread) => count + (thread.unread_count || 0),
+        0,
+      );
   const sampleRows = chat.preview
     ? previewConversations.filter(
         (thread) =>
@@ -110,10 +214,16 @@ export function ChatDashboard() {
           person.name.toLowerCase().includes(chat.search.toLowerCase().trim()),
         )
       : [];
+  const stayAtBottom = useRef(true);
+  const scrollRoute = useRef(conversationId);
+  const newestMessageId = direct.messages.at(-1)?.id;
   useEffect(() => {
     if (sample) useChat.getState().markRead(sample.id);
-    end.current?.scrollIntoView?.({ behavior: "auto" });
-  }, [conversationId, sample]);
+    if (scrollRoute.current !== conversationId) stayAtBottom.current = true;
+    scrollRoute.current = conversationId;
+    if (stayAtBottom.current)
+      end.current?.scrollIntoView?.({ behavior: "auto" });
+  }, [conversationId, sample, newestMessageId]);
   useEffect(() => {
     if (!contactId || contact) return;
     const controller = new AbortController();
@@ -158,10 +268,15 @@ export function ChatDashboard() {
     );
   }
   function selectContact(person: Contact) {
-    setNotice("Draft opened. Nothing has been sent.");
+    setNotice("Conversation opened. Write your first message.");
     chat.addContact(person);
     setPeopleOpen(false);
-    navigate(`/app/conversations/contact-${person.id}`);
+    const existing = direct.conversations.find(
+      (thread) =>
+        thread.type === "direct" &&
+        thread.participants.some((member) => member.id === person.id),
+    );
+    navigate(`/app/conversations/${existing?.id || `contact-${person.id}`}`);
   }
   function closeDetails() {
     chat.setDetails(false);
@@ -177,6 +292,23 @@ export function ChatDashboard() {
       setError(errorMessage(e));
     } finally {
       setSigningOut(false);
+    }
+  }
+  async function sendMessage() {
+    const key = conversationId!;
+    stayAtBottom.current = true;
+    if (direct.savedId)
+      void direct.realtime.indicateTyping(direct.savedId, false);
+    const id = await direct.send(
+      chat.drafts[key] || "",
+      contact,
+      replyMessage?.id,
+    );
+    if (id && useAuth.getState().user?.id === user?.id) {
+      useChat.getState().setDraft(key, "");
+      setReplyDraft(null);
+      if (routeRef.current === key)
+        navigate(`/app/conversations/${id}`, { replace: true });
     }
   }
   const selected = (id: string) => conversationId === id;
@@ -199,15 +331,39 @@ export function ChatDashboard() {
               {chat.preview
                 ? "A little inspiration for your inbox"
                 : "Your space for good conversations"}
+              {!chat.preview && (
+                <span
+                  className="chat-live-status"
+                  role="status"
+                  aria-label="Live connection"
+                >
+                  {" "}
+                  · {direct.realtime.status}
+                </span>
+              )}
             </span>
           </div>
-          <button
-            className="chat-new-button"
-            aria-label="New message"
-            onClick={() => setPeopleOpen(true)}
-          >
-            <Plus size={20} />
-          </button>
+          <div className="chat-list-actions">
+            {!chat.preview && (
+              <>
+                <GroupUpdates version={direct.groupVersion} />
+                <button
+                  className="chat-new-button"
+                  aria-label="New group"
+                  onClick={() => setGroupOpen(true)}
+                >
+                  <UsersRound size={18} />
+                </button>
+              </>
+            )}
+            <button
+              className="chat-new-button"
+              aria-label="New message"
+              onClick={() => setPeopleOpen(true)}
+            >
+              <Plus size={20} />
+            </button>
+          </div>
         </div>
         <div className="chat-search sidebar-search">
           <Search size={16} />
@@ -254,8 +410,24 @@ export function ChatDashboard() {
         </div>
         <div className="chat-list-caption">
           <span>{chat.preview ? "SAMPLE CONVERSATIONS" : "CONVERSATIONS"}</span>
+          {!chat.preview && (
+            <button
+              type="button"
+              className="chat-icon-button"
+              aria-label="Refresh conversations"
+              disabled={direct.listLoading}
+              onClick={() => void direct.loadList()}
+            >
+              ↻
+            </button>
+          )}
           {chat.preview && <span className="chat-preview-chip">Preview</span>}
         </div>
+        {!chat.preview && user && (
+          <Suspense fallback={null}>
+            <ChatTools userId={user.id} version={direct.groupVersion} />
+          </Suspense>
+        )}
         <ul className="chat-thread-list" aria-label="Conversation list">
           {sampleRows.map((thread) => (
             <li key={thread.id}>
@@ -298,29 +470,127 @@ export function ChatDashboard() {
               </Link>
             </li>
           ))}
-          {contactRows.map(([id, person]) => (
-            <li key={id}>
-              <Link
-                className={`chat-thread ${selected(id) ? "selected" : ""}`}
-                to={`/app/conversations/${id}`}
-                aria-current={selected(id) ? "page" : undefined}
-              >
-                <Avatar name={person.name} />
-                <span className="chat-thread-copy">
-                  <span className="chat-thread-top">
-                    <strong>{person.name}</strong>
-                    <span className="chat-draft-label">Draft</span>
-                  </span>
-                  <span className="chat-thread-bottom">
-                    <span>
-                      {chat.drafts[id] || "Not sent · stays in this tab"}
+          {savedRows.map((thread) => {
+            const person = thread.participants.find(
+              (member) => member.id !== user?.id,
+            );
+            const id = String(thread.id);
+            return (
+              <li key={id}>
+                <Link
+                  className={`chat-thread ${selected(id) ? "selected" : ""}`}
+                  to={`/app/conversations/${id}`}
+                  aria-current={selected(id) ? "page" : undefined}
+                >
+                  <Avatar
+                    name={
+                      thread.type === "group"
+                        ? thread.name || "Group"
+                        : person?.name || "Unavailable member"
+                    }
+                    group={thread.type === "group"}
+                    imageUrl={thread.image_url}
+                  />
+                  <span className="chat-thread-copy">
+                    <span className="chat-thread-top">
+                      <strong>
+                        {thread.type === "group"
+                          ? thread.name || "Group"
+                          : person?.name || "Unavailable member"}
+                      </strong>
+                      <time className="chat-thread-time">
+                        {thread.last_message_at
+                          ? new Date(
+                              thread.last_message_at,
+                            ).toLocaleDateString()
+                          : "New"}
+                      </time>
+                    </span>
+                    <span className="chat-thread-bottom">
+                      <span>
+                        {chat.drafts[id]
+                          ? `Draft: ${chat.drafts[id]}`
+                          : thread.latest_message?.deleted_at
+                            ? "Message deleted"
+                            : thread.latest_message?.body ||
+                              thread.latest_message?.attachments?.[0]?.name ||
+                              "No messages yet"}
+                      </span>
+                      {(thread.unread_count || 0) > 0 && (
+                        <span
+                          className="chat-unread"
+                          aria-label={`${thread.unread_count} unread messages`}
+                        >
+                          {thread.unread_count}
+                        </span>
+                      )}
                     </span>
                   </span>
-                </span>
-              </Link>
+                </Link>
+              </li>
+            );
+          })}
+          {!chat.preview && direct.listLoading && (
+            <li className="chat-list-empty" role="status">
+              Loading conversations…
             </li>
-          ))}
-          {!sampleRows.length && !contactRows.length && (
+          )}
+          {!chat.preview && direct.listError && (
+            <li className="chat-list-empty" role="alert">
+              {direct.listError}
+              <button
+                className="chat-secondary"
+                onClick={() => void direct.loadList()}
+              >
+                Retry conversations
+              </button>
+            </li>
+          )}
+          {!chat.preview && direct.listCursor && (
+            <li>
+              <button
+                className="chat-secondary"
+                disabled={direct.listLoading}
+                onClick={() => void direct.loadList(direct.listCursor!)}
+              >
+                Load more conversations
+              </button>
+            </li>
+          )}
+          {contactRows
+            .filter(
+              ([, person]) =>
+                !direct.conversations.some(
+                  (thread) =>
+                    thread.type === "direct" &&
+                    thread.participants.some(
+                      (member) => member.id === person.id,
+                    ),
+                ),
+            )
+            .map(([id, person]) => (
+              <li key={id}>
+                <Link
+                  className={`chat-thread ${selected(id) ? "selected" : ""}`}
+                  to={`/app/conversations/${id}`}
+                  aria-current={selected(id) ? "page" : undefined}
+                >
+                  <Avatar name={person.name} />
+                  <span className="chat-thread-copy">
+                    <span className="chat-thread-top">
+                      <strong>{person.name}</strong>
+                      <span className="chat-draft-label">Draft</span>
+                    </span>
+                    <span className="chat-thread-bottom">
+                      <span>
+                        {chat.drafts[id] || "Not sent · stays in this tab"}
+                      </span>
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          {!sampleRows.length && !contactRows.length && !savedRows.length && (
             <li className="chat-list-empty">
               <MessagesSquare size={26} />
               <strong>
@@ -405,6 +675,7 @@ export function ChatDashboard() {
             aria-label="Dismiss error"
             onClick={() => {
               setError("");
+              direct.dismissSendError();
               if (contactError) setLookup({ key: lookupKey, error: "" });
             }}
           >
@@ -426,22 +697,46 @@ export function ChatDashboard() {
               <Avatar
                 name={active.name}
                 color={sample?.color}
-                group={sample?.kind === "group"}
+                group={sample?.kind === "group" || liveGroup}
+                imageUrl={liveGroup ? live?.image_url : undefined}
               />
               <div className="chat-header-name">
                 <h2>{active.name}</h2>
-                <span>
+                <span role="status" aria-label="Contact presence">
                   {sample ? (
                     sample.subtitle
                   ) : (
                     <>
-                      <ShieldCheck size={12} /> Verified member
+                      <ShieldCheck size={12} />{" "}
+                      {liveGroup && live
+                        ? `${live.participants.length} members${direct.realtime.online[live.id] ? ` · ${direct.realtime.online[live.id].length} online` : ""}`
+                        : live
+                          ? direct.realtime.online[live.id]?.includes(
+                              peer?.id || 0,
+                            )
+                            ? "Online"
+                            : direct.realtime.online[live.id]
+                              ? peer?.last_seen_at
+                                ? `Offline · Last active ${new Date(peer.last_seen_at).toLocaleString()}`
+                                : "Offline"
+                              : "Direct conversation"
+                          : "Verified member"}
                     </>
                   )}
                 </span>
               </div>
               {sample && <span className="chat-preview-chip">Sample</span>}
               <div className="chat-header-actions">
+                {live && (
+                  <button
+                    className="chat-icon-button"
+                    aria-label="Refresh messages"
+                    disabled={direct.historyLoading || direct.sending}
+                    onClick={() => void direct.loadHistory()}
+                  >
+                    ↻
+                  </button>
+                )}
                 <button
                   ref={detailsButton}
                   className={`chat-icon-button ${detailsOpen ? "active" : ""}`}
@@ -473,11 +768,126 @@ export function ChatDashboard() {
             )}
             <div
               className="chat-history"
+              ref={historyRoot}
               role="region"
               aria-label="Message history"
+              onScroll={(event) => {
+                const history = event.currentTarget;
+                stayAtBottom.current =
+                  history.scrollHeight -
+                    history.scrollTop -
+                    history.clientHeight <
+                  80;
+              }}
             >
               <div className="chat-history-inner">
-                {sample ? (
+                {!sample && direct.historyLoading && (
+                  <p role="status">Loading messages…</p>
+                )}
+                {!sample && direct.historyError && (
+                  <div role="alert">
+                    {direct.historyError}
+                    <button
+                      className="chat-secondary"
+                      onClick={() => void direct.loadHistory()}
+                    >
+                      Retry messages
+                    </button>
+                  </div>
+                )}
+                {live && direct.historyCursor && (
+                  <button
+                    className="chat-secondary"
+                    disabled={direct.historyLoading}
+                    onClick={() => void direct.loadHistory(true)}
+                  >
+                    Load older messages
+                  </button>
+                )}
+                {live ? (
+                  <>
+                    {!direct.messages.length &&
+                      !direct.historyLoading &&
+                      !direct.historyError && (
+                        <div className="chat-pending-conversation">
+                          <h2>Start the conversation.</h2>
+                          <p>Your first message will be saved here.</p>
+                        </div>
+                      )}
+                    {direct.messages.map((message) => (
+                      <div
+                        key={message.id}
+                        className={`chat-message ${message.sender?.id === user?.id ? "outgoing" : "incoming"}`}
+                        data-message-id={
+                          message.sender?.id !== user?.id
+                            ? message.id
+                            : undefined
+                        }
+                      >
+                        <div className="chat-message-content">
+                          {liveGroup && message.sender?.id !== user?.id && (
+                            <span className="chat-message-author">
+                              {message.sender?.name || "Former member"}
+                            </span>
+                          )}
+                          {message.reply_to && (
+                            <blockquote className="chat-reply-preview">
+                              Reply to #{message.reply_to.id}:{" "}
+                              {message.reply_to.deleted
+                                ? "Message deleted"
+                                : message.reply_to.body || "Attachment"}
+                            </blockquote>
+                          )}
+                          {message.body && (
+                            <div className="chat-bubble">{message.body}</div>
+                          )}
+                          <MessageExtras
+                            message={message}
+                            userId={user!.id}
+                            canSend={live.can_send}
+                            onUpdate={direct.updateMessage}
+                            onReply={() => {
+                              setReplyDraft({ key: conversationId, message });
+                              document.getElementById("message-draft")?.focus();
+                            }}
+                            onReport={() => {
+                              if (message.sender)
+                                setReport({
+                                  target: message.sender,
+                                  messageId: message.id,
+                                });
+                            }}
+                          />
+                          <div className="chat-message-meta">
+                            {message.edited_at && !message.deleted_at && (
+                              <span>Edited</span>
+                            )}
+                            <time dateTime={message.created_at}>
+                              {new Date(message.created_at).toLocaleString()}
+                            </time>
+                            {message.sender?.id === user?.id && (
+                              <span aria-label="Message status">
+                                {message.receipts?.some(
+                                  (receipt) => receipt.read_at,
+                                )
+                                  ? liveGroup
+                                    ? `Read by ${message.receipts.filter((receipt) => receipt.read_at).length}`
+                                    : "Read"
+                                  : message.receipts?.some(
+                                        (receipt) => receipt.delivered_at,
+                                      )
+                                    ? liveGroup
+                                      ? `Delivered to ${message.receipts.filter((receipt) => receipt.delivered_at).length}`
+                                      : "Delivered"
+                                    : "Saved"}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                ) : sample ? (
                   <>
                     <div className="chat-date-divider">
                       <span>SAMPLE CONVERSATION</span>
@@ -552,8 +962,8 @@ export function ChatDashboard() {
                     <Avatar name={active.name} size="large" />
                     <h2>A conversation with {active.name.split(" ")[0]}.</h2>
                     <p>
-                      You can prepare a draft here. No conversation or message
-                      has been saved.
+                      Write your first message to start a private conversation.
+                      Messages are saved when you send.
                     </p>
                     <span>
                       <ShieldCheck size={13} /> Verified member
@@ -563,9 +973,56 @@ export function ChatDashboard() {
                 <div ref={end} />
               </div>
             </div>
+            {safetyTarget && user && (
+              <div className="chat-safety-actions">
+                <Suspense fallback={null}>
+                  <BlockButton
+                    userId={user.id}
+                    target={safetyTarget}
+                    onChanged={() => void direct.loadHistory()}
+                  />
+                </Suspense>
+                <button
+                  type="button"
+                  className="chat-secondary"
+                  onClick={() => setReport({ target: safetyTarget })}
+                >
+                  Report member
+                </button>
+              </div>
+            )}
+            {live && typingNames.length > 0 && (
+              <p
+                className="chat-typing"
+                role="status"
+                aria-label="Typing indicator"
+              >
+                {typingNames.join(", ")}{" "}
+                {typingNames.length === 1 ? "is" : "are"} typing…
+              </p>
+            )}
+            {replyMessage && (
+              <div className="chat-reply-composer">
+                <span>
+                  Replying to {replyMessage.sender?.name || "member"}:{" "}
+                  {replyMessage.body || "Attachment"}
+                </span>
+                <button
+                  type="button"
+                  className="chat-secondary"
+                  disabled={direct.retry || direct.sending}
+                  onClick={() => setReplyDraft(null)}
+                >
+                  Cancel reply
+                </button>
+              </div>
+            )}
             <form
               className="chat-composer"
-              onSubmit={(e) => e.preventDefault()}
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!sample) void sendMessage();
+              }}
             >
               <div className="chat-compose-box">
                 <label className="chat-visually-hidden" htmlFor="message-draft">
@@ -573,55 +1030,100 @@ export function ChatDashboard() {
                 </label>
                 <textarea
                   id="message-draft"
-                  value={chat.drafts[conversationId!] || ""}
-                  onChange={(e) =>
-                    chat.setDraft(conversationId!, e.target.value)
+                  disabled={
+                    direct.sending ||
+                    direct.retry ||
+                    Boolean(live && !live.can_send)
                   }
+                  value={chat.drafts[conversationId!] || ""}
+                  onChange={(e) => {
+                    chat.setDraft(conversationId!, e.target.value);
+                    if (direct.savedId)
+                      void direct.realtime.indicateTyping(
+                        direct.savedId,
+                        Boolean(e.target.value.trim()),
+                      );
+                  }}
+                  onBlur={() => {
+                    if (direct.savedId)
+                      void direct.realtime.indicateTyping(
+                        direct.savedId,
+                        false,
+                      );
+                  }}
                   placeholder={`Write a draft for ${active.name.split(" ")[0]}…`}
                   maxLength={4000}
                   rows={2}
                 />
                 <div className="chat-compose-toolbar">
                   <div>
-                    <button
-                      type="button"
-                      className="chat-icon-button"
-                      aria-label="Attach a file — not available yet"
-                      disabled
-                    >
-                      <Paperclip size={19} />
-                    </button>
-                    <button
-                      type="button"
-                      className="chat-icon-button"
-                      aria-label="Emoji picker — not available yet"
-                      disabled
-                    >
-                      <Smile size={19} />
-                    </button>
-                    <button
-                      type="button"
-                      className="chat-icon-button"
-                      aria-label="Voice message — not available yet"
-                      disabled
-                    >
-                      <Mic size={19} />
-                    </button>
+                    <Suspense fallback={null}>
+                      <RichComposer
+                        key={conversationId}
+                        userId={user!.id}
+                        conversation={live}
+                        contact={contact}
+                        disabled={
+                          Boolean(sample) ||
+                          direct.sending ||
+                          direct.retry ||
+                          Boolean(live && !live.can_send)
+                        }
+                        draft={chat.drafts[conversationId!] || ""}
+                        replyToId={replyMessage?.id}
+                        onEmoji={(value) =>
+                          chat.setDraft(
+                            conversationId!,
+                            (
+                              (chat.drafts[conversationId!] || "") + value
+                            ).slice(0, 4000),
+                          )
+                        }
+                        onSent={(thread, message) => {
+                          direct.acceptAttachment(thread, message);
+                          setReplyDraft(null);
+                          chat.setDraft(conversationId!, "");
+                          navigate(`/app/conversations/${thread.id}`, {
+                            replace: true,
+                          });
+                        }}
+                      />
+                    </Suspense>
                   </div>
                   <button
                     className="chat-send"
                     type="submit"
-                    aria-label="Send message"
-                    disabled
+                    aria-label={direct.retry ? "Retry send" : "Send message"}
+                    disabled={
+                      Boolean(sample) ||
+                      direct.sending ||
+                      direct.historyLoading ||
+                      Boolean(live && !live.can_send) ||
+                      !(chat.drafts[conversationId!] || "").trim()
+                    }
                   >
-                    <span>Send</span>
+                    <span>
+                      {direct.sending
+                        ? "Saving…"
+                        : direct.retry
+                          ? "Retry send"
+                          : "Send"}
+                    </span>
                     <Send size={15} />
                   </button>
                 </div>
               </div>
               <p className="chat-compose-hint">
-                <ShieldCheck size={12} /> Drafts stay in this tab. Sending isn’t
-                available yet.
+                <ShieldCheck size={12} />{" "}
+                {sample
+                  ? "Preview drafts stay in this tab. Nothing is sent."
+                  : live && !live.can_send
+                    ? "Sending is unavailable for this conversation."
+                    : direct.retry
+                      ? "Send not confirmed. Retry safely with the same message."
+                      : direct.realtime.status === "Live"
+                        ? "Live messages. Read status updates when a message is viewed."
+                        : "Messages are saved securely. Reconnecting; you can still send or refresh."}
                 {(chat.drafts[conversationId!]?.length || 0) > 3500 && (
                   <span>{chat.drafts[conversationId!].length}/4000</span>
                 )}
@@ -659,11 +1161,13 @@ export function ChatDashboard() {
                 GOOD TO SEE YOU, {user?.name.split(" ")[0]?.toUpperCase()}
               </span>
               <h2>
-                {contactLoading
-                  ? "Finding this member…"
-                  : conversationId && !validPreviewId
-                    ? "This conversation isn’t available."
-                    : `A little closer,
+                {direct.historyLoading && !contactId
+                  ? "Loading conversation…"
+                  : contactLoading
+                    ? "Finding this member…"
+                    : conversationId && !validPreviewId
+                      ? "This conversation isn’t available."
+                      : `A little closer,
 one conversation at a time.`}
               </h2>
               <p>
@@ -675,6 +1179,14 @@ one conversation at a time.`}
               </p>
               {!contactLoading && (
                 <>
+                  {direct.historyError && (
+                    <button
+                      className="chat-secondary"
+                      onClick={() => void direct.loadHistory()}
+                    >
+                      Retry messages
+                    </button>
+                  )}
                   <button
                     className="chat-primary"
                     onClick={() => setPeopleOpen(true)}
@@ -713,7 +1225,9 @@ one conversation at a time.`}
         >
           <div className="chat-details-title">
             <h2>
-              {sample?.kind === "group" ? "Group details" : "Contact details"}
+              {sample?.kind === "group" || liveGroup
+                ? "Group details"
+                : "Contact details"}
             </h2>
             <button
               className="chat-icon-button"
@@ -727,13 +1241,45 @@ one conversation at a time.`}
             <Avatar
               name={active.name}
               color={sample?.color}
-              group={sample?.kind === "group"}
+              group={sample?.kind === "group" || liveGroup}
+              imageUrl={liveGroup ? live?.image_url : undefined}
               size="large"
             />
             <h3>{active.name}</h3>
-            <span>{sample ? "Sample profile" : "Verified member"}</span>
+            <span>
+              {sample
+                ? "Sample profile"
+                : live
+                  ? "Conversation participant"
+                  : "Verified member"}
+            </span>
             <p>{active.bio || "This member hasn’t added a bio yet."}</p>
           </div>
+          {liveGroup && live && (
+            <div className="chat-detail-section">
+              <h3>
+                Members <span>{live.participants.length}</span>
+              </h3>
+              {live.participants.map((member) => (
+                <div className="chat-member" key={member.id}>
+                  <Avatar name={member.name} size="tiny" />
+                  <span>
+                    {member.name}
+                    <small className="group-role-label">
+                      {member.role || "member"}
+                    </small>
+                  </span>
+                </div>
+              ))}
+              <button
+                className="chat-secondary"
+                onClick={() => setGroupSettingsId(live.id)}
+              >
+                <Settings2 size={15} />
+                Group settings
+              </button>
+            </div>
+          )}
           {sample?.kind === "group" && (
             <div className="chat-detail-section">
               <h3>
@@ -749,7 +1295,10 @@ one conversation at a time.`}
           )}
           <div className="chat-detail-section">
             <h3>
-              Shared media <span>{sample ? "3 samples" : "0"}</span>
+              Shared media{" "}
+              <span>
+                {sample ? "3 samples" : `${sharedImages.length} loaded`}
+              </span>
             </h3>
             {sample ? (
               <div className="chat-media-grid">
@@ -763,6 +1312,18 @@ one conversation at a time.`}
                   </button>
                 ))}
               </div>
+            ) : sharedImages.length ? (
+              <div className="chat-media-grid">
+                {sharedImages.map((file) => (
+                  <button
+                    key={file.id}
+                    aria-label={`View image: ${file.name}`}
+                    onClick={() => setImage({ src: file.url, alt: file.name })}
+                  >
+                    <img src={file.url} alt={file.name} />
+                  </button>
+                ))}
+              </div>
             ) : (
               <p className="chat-detail-empty">
                 <ImageIcon size={18} /> Shared images will appear here.
@@ -771,7 +1332,10 @@ one conversation at a time.`}
           </div>
           <div className="chat-detail-section">
             <h3>
-              Shared files <span>{sample ? "2 samples" : "0"}</span>
+              Shared files{" "}
+              <span>
+                {sample ? "2 samples" : `${sharedFiles.length} loaded`}
+              </span>
             </h3>
             {sample ? (
               ["A-few-thoughts.pdf", "Ideas-for-the-week.txt"].map(
@@ -787,6 +1351,21 @@ one conversation at a time.`}
                   </div>
                 ),
               )
+            ) : sharedFiles.length ? (
+              sharedFiles.map((file) => (
+                <a
+                  className="chat-shared-file"
+                  key={file.id}
+                  href={file.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <FileText size={19} />
+                  <span>
+                    {file.name} · {Math.ceil(file.size / 1024)} KB
+                  </span>
+                </a>
+              ))
             ) : (
               <p className="chat-detail-empty">
                 <FileText size={18} /> No shared files yet.
@@ -798,7 +1377,9 @@ one conversation at a time.`}
             <p>
               {sample
                 ? "These profiles, messages and files are fictional design samples."
-                : "Only the member’s public profile is shown. No private conversation has been created."}
+                : live
+                  ? "Only participants can access this saved conversation."
+                  : "Your first message starts a private conversation with this member."}
             </p>
           </div>
         </aside>
@@ -815,6 +1396,47 @@ one conversation at a time.`}
             <X size={14} />
           </button>
         </div>
+      )}
+      <Suspense
+        fallback={
+          <div className="chat-notice" role="status">
+            Opening group…
+          </div>
+        }
+      >
+        {groupOpen && (
+          <GroupDialog
+            onClose={() => setGroupOpen(false)}
+            onCreated={(group) => {
+              direct.adoptConversation(group);
+              chat.setPreview(false);
+              setGroupOpen(false);
+              navigate(`/app/conversations/${group.id}`);
+            }}
+          />
+        )}
+        {groupSettingsId === live?.id && liveGroup && live && (
+          <GroupManager
+            group={live}
+            onClose={() => setGroupSettingsId(null)}
+            onChanged={direct.adoptConversation}
+            onLeft={() => {
+              direct.dropConversation(live.id);
+              setGroupSettingsId(null);
+              navigate("/app");
+            }}
+          />
+        )}
+      </Suspense>
+      {report && user && (
+        <Suspense fallback={null}>
+          <ReportDialog
+            userId={user.id}
+            target={report.target}
+            messageId={report.messageId}
+            onClose={() => setReport(null)}
+          />
+        </Suspense>
       )}
       {peopleOpen && (
         <PeopleDialog
@@ -842,8 +1464,10 @@ one conversation at a time.`}
         >
           <p className="chat-dialog-intro">
             Your account, profile and sessions are ready. You can find verified
-            members and prepare temporary drafts. Sending messages and saving
-            conversations aren’t available yet.
+            members and send direct text messages. Conversations and messages
+            are saved to your account. New messages appear live, with typing,
+            presence and read receipts. Reconnecting catches up from saved
+            history.
           </p>
           <p className="chat-dialog-intro">
             The optional design preview uses fictional profiles, messages and

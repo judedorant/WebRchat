@@ -9,7 +9,7 @@ class UserReport extends Model
 {
     protected function casts(): array
     {
-        return ['reviewed_at' => 'datetime'];
+        return ['reviewed_at' => 'datetime', 'evidence' => 'array'];
     }
 
     public function reporter(): BelongsTo

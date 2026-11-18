@@ -1,4 +1,9 @@
-import { expect, type APIRequestContext, type Page } from "@playwright/test";
+import {
+  test,
+  expect,
+  type APIRequestContext,
+  type Page,
+} from "@playwright/test";
 // Keep this origin identical to FRONTEND_URL / APP_URL used in notification links.
 export const site = process.env.E2E_AUTH_BASE_URL || "http://localhost:5173";
 const inbox = process.env.E2E_MAILPIT_URL || "http://127.0.0.1:8026";
@@ -70,6 +75,7 @@ export async function registerVerified(
   name: string,
   email: string,
 ) {
+  test.setTimeout(120000);
   await page.goto("/register");
   await page.getByLabel("Full name", { exact: true }).fill(name);
   await page.getByLabel("Email address", { exact: true }).fill(email);
@@ -77,9 +83,26 @@ export async function registerVerified(
   await page
     .getByLabel("Confirm password", { exact: true })
     .fill(accountPassword);
-  await page
-    .getByRole("button", { name: "Create account", exact: true })
-    .click();
+  const submit = () =>
+    Promise.all([
+      page.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === "/api/v1/register" &&
+          response.request().method() === "POST",
+      ),
+      page.getByRole("button", { name: "Create account", exact: true }).click(),
+    ]);
+  const [response] = await submit();
+  if (response.status() === 429) {
+    // Honor the real registration throttle when the complete suite creates
+    // more than five accounts. Do not weaken the application's abuse controls.
+    const seconds = Math.min(
+      60,
+      Math.max(1, Number(response.headers()["retry-after"]) || 60),
+    );
+    await new Promise((resolve) => setTimeout(resolve, (seconds + 1) * 1000));
+    await submit();
+  }
   await expect(page).toHaveURL(/\/verify-email$/);
   await page.goto(await emailLink(request, email, "/verify-email"));
   await page

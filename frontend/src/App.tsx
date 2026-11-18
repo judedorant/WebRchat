@@ -100,7 +100,7 @@ function Foundation() {
             <h2>A solid place to build.</h2>
           </div>
           <span className="phase-badge">
-            <Layers3 size={14} /> Phase 03 · Workspace
+            <Layers3 size={14} /> Phase 08 · Chat & safety
           </span>
         </div>
         <div className="cards">
@@ -213,7 +213,7 @@ function Roadmap() {
     <section className="roadmap">
       <span className="overline">THE ROAD AHEAD</span>
       <h1>Built with intention.</h1>
-      <p>Phases 1–3 are implemented. Later phases require approval.</p>
+      <p>Phases 1–8 are implemented. Later phases require approval.</p>
       <ol>
         {[
           "Foundation, architecture, Docker & schema",
@@ -230,7 +230,7 @@ function Roadmap() {
           <li key={phase}>
             <span>{String(index + 1).padStart(2, "0")}</span>
             {phase}
-            <small>{index < 3 ? "Implemented" : "Planned"}</small>
+            <small>{index < 8 ? "Implemented" : "Planned"}</small>
           </li>
         ))}
       </ol>

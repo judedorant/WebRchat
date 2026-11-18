@@ -1,6 +1,7 @@
 import axios from "axios";
 import { api } from "./api";
 export interface User {
+  realtime_enabled?: boolean;
   id: number;
   name: string;
   email: string;
@@ -26,9 +27,10 @@ export async function mutate<T>(
   method: "post" | "patch" | "put" | "delete",
   path: string,
   data?: unknown,
+  headers?: Record<string, string>,
 ): Promise<T> {
   await csrf();
-  return (await api.request<T>({ method, url: path, data })).data;
+  return (await api.request<T>({ method, url: path, data, headers })).data;
 }
 export function errorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {

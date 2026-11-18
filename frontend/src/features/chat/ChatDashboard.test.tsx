@@ -23,7 +23,14 @@ const user = {
   email_verified_at: "2026-11-13T00:00:00Z",
   roles: ["user"],
 };
-const get = vi.spyOn(api, "get");
+const get = vi.fn<typeof api.get>();
+vi.spyOn(api, "get").mockImplementation((url, options) =>
+  url === "/conversations" || url === "/notifications"
+    ? Promise.resolve({
+        data: { data: [], meta: { next_cursor: null } },
+      } as never)
+    : get(url, options),
+);
 Object.defineProperty(HTMLDialogElement.prototype, "showModal", {
   configurable: true,
   value: function (this: HTMLDialogElement) {
@@ -208,7 +215,7 @@ describe("chat workspace", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(
       screen.getByText(
-        "You can prepare a draft here. No conversation or message has been saved.",
+        "Write your first message to start a private conversation. Messages are saved when you send.",
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Send message" })).toBeDisabled();
@@ -310,4 +317,58 @@ describe("chat workspace", () => {
       screen.queryByRole("region", { name: "Message history" }),
     ).not.toBeInTheDocument();
   });
+});
+
+it("does not jump to new messages when the reader has scrolled up", async () => {
+  const person = { id: 2, name: "Riley", bio: null, avatar_url: null };
+  const thread = {
+    id: 11,
+    participants: [user, person],
+    type: "direct",
+    can_send: true,
+    latest_message: null,
+  };
+  let refresh = false;
+  get.mockImplementation(async (url) =>
+    url.endsWith("/messages")
+      ? {
+          data: {
+            data: [
+              {
+                id: refresh ? 22 : 21,
+                conversation_id: 11,
+                sender: person,
+                body: refresh
+                  ? "New incoming message"
+                  : "Older incoming message",
+                client_uuid: "uuid",
+                created_at: "2026-11-17T00:00:00Z",
+              },
+            ],
+            meta: { next_cursor: null },
+          },
+        }
+      : { data: { data: thread } },
+  );
+  const scroll = vi.fn();
+  const originalScroll = HTMLElement.prototype.scrollIntoView;
+  HTMLElement.prototype.scrollIntoView = scroll;
+  try {
+    workspace("/app/conversations/11");
+    await screen.findByText("Older incoming message");
+    const history = screen.getByRole("region", { name: "Message history" });
+    Object.defineProperties(history, {
+      scrollHeight: { configurable: true, value: 1000 },
+      clientHeight: { configurable: true, value: 200 },
+      scrollTop: { configurable: true, writable: true, value: 0 },
+    });
+    fireEvent.scroll(history);
+    scroll.mockClear();
+    refresh = true;
+    fireEvent.click(screen.getByRole("button", { name: "Refresh messages" }));
+    await screen.findByText("New incoming message");
+    expect(scroll).not.toHaveBeenCalled();
+  } finally {
+    HTMLElement.prototype.scrollIntoView = originalScroll;
+  }
 });

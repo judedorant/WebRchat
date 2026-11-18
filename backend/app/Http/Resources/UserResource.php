@@ -13,6 +13,7 @@ class UserResource extends JsonResource
 
         return [
             'id' => $this->id,
+            'realtime_enabled' => $this->when($self, $this->hasVerifiedEmail()),
             'name' => $this->name,
             'bio' => $this->bio,
             'avatar_url' => null, // Private image uploads belong to Phase 7.

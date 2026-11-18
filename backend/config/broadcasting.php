@@ -14,7 +14,13 @@ return [
                 'scheme' => env('REVERB_SCHEME', 'http'),
                 'useTLS' => env('REVERB_SCHEME', 'http') === 'https',
             ],
-            'client_options' => [],
+            'client_options' => [
+                'proxy' => [
+                    'http' => env('HTTP_PROXY', env('http_proxy')),
+                    'https' => env('HTTPS_PROXY', env('https_proxy')),
+                    'no' => array_values(array_unique(array_merge(explode(',', env('NO_PROXY', env('no_proxy', ''))), ['reverb', 'localhost', '127.0.0.1']))),
+                ],
+            ],
         ],
         'log' => ['driver' => 'log'],
         'null' => ['driver' => 'null'],

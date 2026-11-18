@@ -1,4 +1,6 @@
 export interface Contact {
+  role?: "owner" | "admin" | "member";
+  last_seen_at?: string | null;
   id: number;
   name: string;
   bio: string | null;
