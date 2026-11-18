@@ -2,6 +2,8 @@
 
 A Laravel 13 + React/TypeScript real-time chat project. **Phases 1–8**: Docker infrastructure, normalized schema, responsive foundation UI, cookie-based authentication, email verification/recovery, profiles, revocable sessions, role-based access and a responsive chat workspace. Direct and group text conversations, live delivery, typing, scoped presence, unread counts and delivered/read receipts are implemented. Groups include owner/admin/member permissions, member management, private images and membership updates. Private image/file/voice uploads, emoji, live reactions, replies, author editing/deletion, persistent notifications, server history/conversation search, blocking and reporting are implemented.
 
+For desktop installation and everyday use, see the [User manual](docs/user-manual.md).
+
 ## Quick start
 
 For a new local checkout:
